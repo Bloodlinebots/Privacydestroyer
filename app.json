@@ -1,0 +1,24 @@
+{
+  "name": "SavexUserBot",
+  "description": "Multi-session Telegram userbot with spam, privacy saver, and session logging.",
+  "repository": "https://github.com/savexedits/multi-userbot",
+  "env": {
+    "API_ID": {
+      "description": "Your Telegram API ID",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Your Telegram API Hash",
+      "required": true
+    },
+    "MONGO_URI": {
+      "description": "Your MongoDB connection string",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
