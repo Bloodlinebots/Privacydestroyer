@@ -14,11 +14,11 @@
     },
     "BOT_TOKEN": {
       "description": "Your Telegram bot token from @BotFather",
-      "required": true
+      "value": ""
     },
     "MONGO_URI": {
       "description": "Your MongoDB connection string",
-      "required": true
+      "value": ""
     }
   },
   "buildpacks": [
