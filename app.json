@@ -1,8 +1,8 @@
 {
   "name": "Multi-Session UserBot",
-  "description": "A Telegram userbot manager that supports session string connection, DM spam, and disappearing media saver.",
+  "description": "Supports both Telethon and Pyrogram userbots with media saver & spam tools.",
   "repository": "https://github.com/yourusername/yourrepo",
-  "keywords": ["telegram", "userbot", "telethon", "dmspam", "media-saver"],
+  "keywords": ["telegram", "userbot", "telethon", "pyrogram", "dmspam", "media-saver"],
   "env": {
     "API_ID": {
       "description": "Your Telegram API ID",
@@ -13,18 +13,15 @@
       "value": "d9fb9ba59c30ae80c25c30d5c4c26e87"
     },
     "BOT_TOKEN": {
-      "description": "Your Telegram bot token from @BotFather"
+      "description": "Your Telegram bot token from @BotFather",
+      "value": ""
     },
     "MONGO_URI": {
-      "description": "Your MongoDB connection string"
+      "description": "Your MongoDB connection string",
+      "value": ""
     }
   },
-  "buildpacks": [
-    {
-      "url": "heroku/python"
-    }
-  ],
-  "addons": [],
+  "buildpacks": [{ "url": "heroku/python" }],
   "scripts": {
     "postdeploy": "echo ✅ Bot deployed successfully."
   }
