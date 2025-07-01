@@ -13,12 +13,10 @@
       "value": "d9fb9ba59c30ae80c25c30d5c4c26e87"
     },
     "BOT_TOKEN": {
-      "description": "Your Telegram bot token from @BotFather",
-      "value": ""
+      "description": "Your Telegram bot token from @BotFather"
     },
     "MONGO_URI": {
-      "description": "Your MongoDB connection string",
-      "value": ""
+      "description": "Your MongoDB connection string"
     }
   },
   "buildpacks": [
