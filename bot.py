@@ -37,7 +37,7 @@ running_clients = {}
 # Telegram Bot App
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-# /start
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Help", callback_data="help")]]
     await update.message.reply_text(
@@ -45,7 +45,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# /help
+# /help command
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📖 Commands:\n"
@@ -54,7 +54,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🛡️ Disappearing media is auto-saved to Saved Messages."
     )
 
-# /connect
+# /connect command
 async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(context.args) != 1:
         await update.message.reply_text("❌ Please provide a valid session string.")
@@ -78,6 +78,15 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Session not authorized. Login needed.")
             return
 
+    except SessionPasswordNeededError:
+        await update.message.reply_text("❌ 2FA Password required. Cannot connect this session.")
+        return
+    except Exception as e:
+        logger.error(f"Session connect error: {e}")
+        await update.message.reply_text("❌ Failed to connect session.")
+        return
+
+    try:
         me = await client.get_me()
         running_clients[user_id] = client
 
@@ -101,7 +110,7 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.warning(f"Media save failed: {e}")
 
-        # DM Spam Handler (.dmspam and /dmspam)
+        # DM Spam Handler (.dmspam)
         @client.on(events.NewMessage(pattern=r"[./]dmspam (.+) (\d+) (.+)", outgoing=True))
         async def dmspam_handler(event):
             try:
@@ -121,23 +130,48 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Session connected and running.")
 
     except Exception as e:
-        logger.error(f"Session connect error: {e}")
-        await update.message.reply_text("❌ Failed to connect session.")
+        logger.error(f"Session finalization error: {e}")
+        await update.message.reply_text("❌ Unexpected error during session connection.")
 
-# Callback button handler
+# Optional: Bot-side /dmspam handler
+async def dmspam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 3:
+        await update.message.reply_text("Usage: /dmspam <username> <count> <message>")
+        return
+
+    username = context.args[0]
+    try:
+        count = int(context.args[1])
+        message = ' '.join(context.args[2:])
+        client = running_clients.get(update.effective_user.id)
+        if not client:
+            await update.message.reply_text("❌ No session found. Please /connect first.")
+            return
+        user = await client.get_entity(username)
+        for _ in range(count):
+            await client.send_message(user, message)
+        await update.message.reply_text(f"✅ Sent {count} messages to {username}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed: {e}")
+
+# CallbackQuery handler
 async def callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.data == "help":
         await update.callback_query.answer()
-        await help_command(update.callback_query, context)
+        await update.callback_query.message.reply_text(
+            "📖 Commands:\n"
+            "/connect <SESSION_STRING> - Connect your account\n"
+            ".dmspam or /dmspam <username> <count> <message> - Spam someone's DM\n"
+            "🛡️ Disappearing media is auto-saved to Saved Messages."
+        )
 
-# Handlers
+# Add all handlers
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("help", help_command))
 app.add_handler(CommandHandler("connect", connect))
+app.add_handler(CommandHandler("dmspam", dmspam_command))  # Optional bot-side
 app.add_handler(CallbackQueryHandler(callback_query))
-app.add_handler(MessageHandler(filters.Regex("^/start$"), start))
-app.add_handler(MessageHandler(filters.Regex("^/help$"), help_command))
 
-# Run Bot
+# Run the bot
 print("🤖 Bot is running...")
 app.run_polling()
