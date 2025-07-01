@@ -23,8 +23,8 @@ LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304"))
 
 # --- Constants ---
-WELCOME_IMAGE = "https://telegra.ph/file/9bece5bbddbe2e36a01f4.jpg"  # change this
-SUPPORT_LINK = "https://t.me/your_support_channel"  # change this
+WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg"  # change this
+SUPPORT_LINK = "https://t.me/valahallah"  # change this
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
