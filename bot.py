@@ -280,7 +280,7 @@ login_conv = ConversationHandler(
 )
 
 fetch_menu_conv = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & filters.Regex("^📥 DOWNLOAD NON FORWARDING MEDIA $"), menu_fetch_request)],
+    entry_points=[MessageHandler(filters.TEXT & filters.Regex("^📥 Download Non-Forwardable Media $"), menu_fetch_request)],
     states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
     fallbacks=[],
 )
