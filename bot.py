@@ -99,7 +99,9 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_login_data[user_id]["api_hash"] = text if text != "/skip" else DEFAULT_API_HASH
     await update.message.reply_text("📞 Eɴᴛᴇʀ ʏᴏᴜʀ Pʜᴏɴᴇ Nᴜᴍʙᴇʀ (ᴡɪᴛʜ +ᴄᴏᴅᴇ):")
     return PHONE
-    async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ⬇️ This function must be placed outside — not inside another function
+async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     phone = update.message.text.strip()
     user_login_data[user_id]["phone"] = phone
