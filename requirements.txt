@@ -6,3 +6,4 @@ motor==2.5.1
 pymongo==3.12.3
 dnspython==2.4.2
 python-dotenv==1.0.1
+nest_asyncio
