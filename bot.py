@@ -324,8 +324,14 @@ async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
-        API_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_id), CommandHandler("skip", skip_api_id)],
-        API_HASH: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_api_hash), CommandHandler("skip", skip_api_hash)],
+        API_ID: [
+    CommandHandler("skip", skip_api_id),
+    MessageHandler(filters.TEXT, get_api_id)
+],
+API_HASH: [
+    CommandHandler("skip", skip_api_hash),
+    MessageHandler(filters.TEXT, get_api_hash)
+],
         PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
         CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_otp)],
         PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_password)],
