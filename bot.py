@@ -360,10 +360,15 @@ app.add_handler(login_conv)
 app.add_handler(fetch_menu_conv)
 
 # --- Run Bot ---
-async def main():
-    await auto_connect_all_sessions()
-    print("🤖 Bot is running...")
-    await app.run_polling()
+if __name__ == "__main__":
+    import asyncio
 
-# At end of your bot.py
+    async def main():
+        await auto_connect_all_sessions()
+        print("🤖 Bot is running...")
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        await app.updater.idle()
 
+    asyncio.run(main())
