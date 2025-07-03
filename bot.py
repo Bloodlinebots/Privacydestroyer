@@ -348,11 +348,11 @@ fetch_menu_conv = ConversationHandler(
 if __name__ == "__main__":
     nest_asyncio.apply()
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("cancel", cancel))
-app.add_handler(login_conv)                  # ✅ Yeh pehle hona chahiye
-app.add_handler(fetch_menu_conv)             # ✅ Yeh bhi pehle hona chahiye
-app.add_handler(MessageHandler(filters.COMMAND, unknown_command))  # ✅ Yeh sabse last me
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancel", cancel))
+    app.add_handler(login_conv)                  # ✅ Yeh pehle hona chahiye
+    app.add_handler(fetch_menu_conv)             # ✅ Yeh bhi pehle hona chahiye
+    app.add_handler(MessageHandler(filters.COMMAND, unknown_command))  # ✅ Yeh sabse last me
 
     async def start_bot():
         await auto_connect_all_sessions()
