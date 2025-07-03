@@ -1,4 +1,5 @@
 import os
+import nest_asyncio
 import asyncio
 import logging
 from datetime import datetime
@@ -353,9 +354,12 @@ app.add_handler(login_conv)
 app.add_handler(fetch_menu_conv)
 
 if __name__ == "__main__":
-    import asyncio
-    async def main():
+    nest_asyncio.apply()
+
+    async def start_bot():
         await auto_connect_all_sessions()
         print("🤖 Bot is running...")
         await app.run_polling()
-    asyncio.run(main())    
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_bot())
