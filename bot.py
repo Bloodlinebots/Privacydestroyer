@@ -66,9 +66,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🔐 <i>sᴇᴄᴜʀᴇʟʏ ᴄᴏɴɴᴇᴄᴛ ʏᴏᴜʀ Tᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛ .</i>\n\n"
         "<b>⚙️ 𝗳𝗲𝗮𝘁𝘂𝗿𝗲𝘀:</b>\n"
         "• sᴀᴠᴇ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ ғʀᴏᴍ ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀᴛs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ 📦\n"
-        "• ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴄᴏɴᴛᴇɴᴛ ғʀᴏᴍ ɢʀᴏᴜᴘs & ᴄʜᴀɴɴᴇʟs🔓\n"
-        "• ʙᴀᴄᴋɢʀᴏᴜɴᴅ ᴘʀᴏᴄᴇssɪɴɢ ᴡɪᴛʜᴏᴜᴛ ɴᴇᴇᴅɪɴɢ ʏᴏᴜʀ ᴍᴀɪɴ ᴘʜᴏɴᴇ  📲\n\n"
-        " 𝗽𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 ~ 𝘁𝗲𝗮𝗺 𝘃𝗮𝗹𝗹𝗮𝗵𝗮𝗹𝗹𝗮"
+        "• ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴄᴏɴᴛᴇɴᴛ ғʀᴏᴍ ɢʀᴏᴜᴘs & ᴄʜᴀɴɴᴇʟs 🔓\n"
+        "• ʙᴀᴄᴋɢʀᴏᴜɴᴅ ᴘʀᴏᴄᴇssɪɴɢ ᴡɪᴛʜᴏᴜᴛ ɴᴇᴇᴅɪɴɢ ʏᴏᴜʀ ᴍᴀɪɴ ᴘʜᴏɴᴇ 📲\n\n"
+        "𝗽𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 ~ 𝘁𝗲𝗮𝗺 𝘃𝗮𝗹𝗹𝗮𝗵𝗮𝗹𝗹𝗮"
     )
     await update.message.reply_photo(
         photo=WELCOME_IMAGE,
@@ -95,21 +95,21 @@ async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.answer("⚠️ Tʜɪs ʙᴜᴛᴛᴏɴ ɪs ᴇxᴘɪʀᴇᴅ. Usᴇ /start ᴀɢᴀɪɴ.", show_alert=True)
         return ConversationHandler.END
 
-async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❓ Uɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ. Usᴇ /start ᴛᴏ ʙᴇɢɪɴ ᴀɢᴀɪɴ.")
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id] = {"api_id": DEFAULT_API_ID}
+    user_login_data[update.effective_user.id] = {
+        "api_id": DEFAULT_API_ID,
+        "api_hash": DEFAULT_API_HASH
+    }
     await update.message.reply_text(
-        "📲 <b>Eɴᴛᴇʀ ʏᴏᴜʀ API HASH </b> ᴏʀ sᴇɴᴅ /skip ᴛᴏ ᴜsᴇ ᴅᴇғᴀᴜʟᴛ",
-        parse_mode="HTML"
+        "📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ)"
     )
-    return API_HASH
-
-async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id]["api_hash"] = DEFAULT_API_HASH
-    await update.message.reply_text("📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ)")
     return PHONE
 
+async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📞 ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ (ᴡɪᴛʜ ᴄᴏᴜɴᴛʀʏ ᴄᴏᴅᴇ)"
+    )
+    return PHONE
 async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.startswith('/'):
@@ -276,6 +276,9 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {e}")
     return ConversationHandler.END
 
+async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❓ Uɴᴋɴᴏᴡɴ ᴄᴏᴍᴍᴀɴᴅ. Usᴇ /start ᴛᴏ ʙᴇɢɪɴ ᴀɢᴀɪɴ.")
+
 # --- Handlers ---
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
@@ -291,7 +294,9 @@ login_conv = ConversationHandler(
 )
 
 fetch_menu_conv = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & filters.Regex("(?i).*Download Non-Forwardable Media.*"), menu_fetch_request)],
+    entry_points=[
+        MessageHandler(filters.TEXT & filters.Regex("(?i).*non.*forward.*media.*"), menu_fetch_request)
+    ],
     states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
     fallbacks=[CommandHandler("cancel", cancel)],
 )
