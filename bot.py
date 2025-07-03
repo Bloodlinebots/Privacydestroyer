@@ -366,10 +366,7 @@ if __name__ == "__main__":
     async def main():
         await auto_connect_all_sessions()
         print("🤖 Bot is running...")
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()
-        await app.updater.idle()
+        await app.run_polling()  # ✅ handles initialize, start, polling, and idle internally
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    loop.run_until_complete(main())  # ✅ avoid asyncio.run() conflict on Heroku
