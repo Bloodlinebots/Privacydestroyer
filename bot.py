@@ -107,7 +107,7 @@ async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ 𝗔𝗣𝗜 𝗜𝗗 𝗺𝘂𝘀𝘁 𝗯𝗲 𝗮 𝗻𝘂𝗺𝗯𝗲𝗿. 𝗧𝗿𝘆 𝗮𝗴𝗮𝗶𝗻 𝗼𝗿 𝘀𝗲𝗻𝗱 /skip.")
         return API_ID
     user_login_data[update.effective_user.id] = {"api_id": int(text)}
-    await update.message.reply_text("🔑 𝗦𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗔𝗣𝗜 𝗛𝗔𝗦𝗛 𝗼𝗿 /skip")
+    await update.message.reply_text("🔑 𝗦𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗔𝗣𝗜 𝗛𝗔𝗦𝗛 𝗼𝗿 /skip 𝗼𝗿 /cancel")
     return API_HASH
 
 async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,7 +115,7 @@ async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text.startswith("/"):
         return await skip_api_hash(update, context)
     user_login_data[update.effective_user.id]["api_hash"] = text
-    await update.message.reply_text("📞 𝗡𝗼𝘄 𝘀𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗽𝗵𝗼𝗻𝗲 𝗻𝘂𝗺𝗯𝗲𝗿 (𝘄𝗶𝘁𝗵 𝗰𝗼𝘂𝗻𝘁𝗿𝘆 𝗰𝗼𝗱𝗲):")
+    await update.message.reply_text("📞 𝗡𝗼𝘄 𝘀𝗲𝗻𝗱 𝘆𝗼𝘂𝗿 𝗽𝗵𝗼𝗻𝗲 𝗻𝘂𝗺𝗯𝗲𝗿 (𝘄𝗶𝘁𝗵 𝗰𝗼𝘂𝗻𝘁𝗿𝘆 𝗰𝗼𝗱𝗲) 𝗼𝗿 /cancel:")
     return PHONE
 
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
