@@ -1,4 +1,3 @@
-# part 1: setup, config, handlers
 import os
 import nest_asyncio
 import asyncio
@@ -24,12 +23,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_API_ID = int(os.getenv("API_ID"))
-DEFAULT_API_HASH = os.getenv("API_HASH")
-MONGO_URI = os.getenv("MONGO_URI")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875"))
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304"))
+DEFAULT_API_ID = int(os.getenv("API_ID")) #add api id default
+DEFAULT_API_HASH = os.getenv("API_HASH") #add your api hash
+MONGO_URI = os.getenv("MONGO_URI") #add  your mongo db url
+BOT_TOKEN = os.getenv("BOT_TOKEN") #add your telegram bot token
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875")) #add your log channel for sending log
+ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304")) #add your admin id
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("UserBot")
@@ -44,8 +43,8 @@ user_login_data = {}
 active_clients = []
 connected_users = set()
 
-WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg"
-SUPPORT_LINK = "https://t.me/valahallah"
+WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg" #add your welcome image
+SUPPORT_LINK = "https://t.me/valahallah" #add your support channel link
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inline_kb = InlineKeyboardMarkup([
